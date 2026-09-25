@@ -3,6 +3,7 @@ import os
 import re
 from typing import Any
 from ai_scientist.utils.token_tracker import track_token_usage
+from ai_scientist import claude_code
 
 import anthropic
 import backoff
@@ -11,6 +12,13 @@ import openai
 MAX_NUM_TOKENS = 4096
 
 AVAILABLE_LLMS = [
+    # Claude via your Claude subscription (Claude Agent SDK, no API key)
+    "claude-code/opus",
+    "claude-code/sonnet",
+    "claude-code/haiku",
+    "claude-code/claude-opus-5-5",
+    "claude-code/claude-sonnet-5",
+    "claude-code/claude-haiku-4-5",
     "claude-3-5-sonnet-20240620",
     "claude-3-5-sonnet-20241022",
     # OpenAI models
@@ -98,7 +106,16 @@ def get_batch_responses_from_llm(
     if msg_history is None:
         msg_history = []
 
-    if model.startswith("ollama/"):
+    if claude_code.is_claude_code_model(model):
+        new_msg_history = msg_history + [{"role": "user", "content": msg}]
+        content = [
+            claude_code.query(new_msg_history, model, system_message)[0]
+            for _ in range(n_responses)
+        ]
+        new_msg_history = [
+            new_msg_history + [{"role": "assistant", "content": c}] for c in content
+        ]
+    elif model.startswith("ollama/"):
         new_msg_history = msg_history + [{"role": "user", "content": msg}]
         response = client.chat.completions.create(
             model=model.replace("ollama/", ""),
@@ -277,7 +294,11 @@ def get_response_from_llm(
     if msg_history is None:
         msg_history = []
 
-    if "claude" in model:
+    if claude_code.is_claude_code_model(model):
+        new_msg_history = msg_history + [{"role": "user", "content": msg}]
+        content, _, _ = claude_code.query(new_msg_history, model, system_message)
+        new_msg_history = new_msg_history + [{"role": "assistant", "content": content}]
+    elif "claude" in model:
         new_msg_history = msg_history + [
             {
                 "role": "user",
@@ -478,7 +499,10 @@ def extract_json_between_markers(llm_output: str) -> dict | None:
 
 
 def create_client(model) -> tuple[Any, str]:
-    if model.startswith("claude-"):
+    if claude_code.is_claude_code_model(model):
+        print(f"Using Claude subscription (Claude Agent SDK) with model {model}.")
+        return None, model
+    elif model.startswith("claude-"):
         print(f"Using Anthropic API with model {model}.")
         return anthropic.Anthropic(), model
     elif model.startswith("bedrock") and "claude" in model:

@@ -3,6 +3,7 @@ import hashlib
 import pymupdf
 import re
 import base64
+from ai_scientist import claude_code
 from ai_scientist.vlm import (
     get_response_from_vlm,
     get_batch_responses_from_vlm,
@@ -430,13 +431,15 @@ def detect_duplicate_figures(client, client_model, pdf_path):
         )
 
     try:
-        response = client.chat.completions.create(
-            model=client_model,
-            messages=messages,
-            max_tokens=1000,
-        )
-
-        analysis = response.choices[0].message.content
+        if claude_code.is_claude_code_model(client_model):
+            analysis, _, _ = claude_code.query(messages, client_model)
+        else:
+            response = client.chat.completions.create(
+                model=client_model,
+                messages=messages,
+                max_tokens=1000,
+            )
+            analysis = response.choices[0].message.content
 
         return analysis
 

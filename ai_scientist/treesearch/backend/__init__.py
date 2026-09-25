@@ -1,4 +1,5 @@
-from . import backend_anthropic, backend_openai
+from . import backend_anthropic, backend_claude_code, backend_openai
+from ai_scientist.claude_code import is_claude_code_model
 from .utils import FunctionSpec, OutputType, PromptType, compile_prompt_to_md
 
 def get_ai_client(model: str, **model_kwargs):
@@ -11,7 +12,9 @@ def get_ai_client(model: str, **model_kwargs):
     Returns:
         An instance of the appropriate AI client.
     """
-    if "claude-" in model:
+    if is_claude_code_model(model):
+        return None
+    elif "claude-" in model:
         return backend_anthropic.get_ai_client(model=model, **model_kwargs)
     else:
         return backend_openai.get_ai_client(model=model, **model_kwargs)
@@ -66,7 +69,12 @@ def query(
     else:
         model_kwargs["max_tokens"] = max_tokens
 
-    query_func = backend_anthropic.query if "claude-" in model else backend_openai.query
+    if is_claude_code_model(model):
+        query_func = backend_claude_code.query
+    elif "claude-" in model:
+        query_func = backend_anthropic.query
+    else:
+        query_func = backend_openai.query
     output, req_time, in_tok_count, out_tok_count, info = query_func(
         system_message=compile_prompt_to_md(system_message) if system_message else None,
         user_message=compile_prompt_to_md(user_message) if user_message else None,

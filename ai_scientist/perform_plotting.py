@@ -265,7 +265,7 @@ def main():
     )
     parser.add_argument(
         "--model",
-        default="o1-2024-12-17",
+        default="claude-code/sonnet",
         help="LLM model to use (default: o1-2024-12-17).",
     )
     parser.add_argument(

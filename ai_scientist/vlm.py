@@ -7,10 +7,18 @@ import openai
 import os
 from PIL import Image
 from ai_scientist.utils.token_tracker import track_token_usage
+from ai_scientist import claude_code
 
 MAX_NUM_TOKENS = 4096
 
 AVAILABLE_VLMS = [
+    # Claude via your Claude subscription (Claude Agent SDK, no API key)
+    "claude-code/opus",
+    "claude-code/sonnet",
+    "claude-code/haiku",
+    "claude-code/claude-opus-5-5",
+    "claude-code/claude-sonnet-5",
+    "claude-code/claude-haiku-4-5",
     "gpt-4o-2024-05-13",
     "gpt-4o-2024-08-06",
     "gpt-4o-2024-11-20",
@@ -144,7 +152,7 @@ def get_response_from_vlm(
     if msg_history is None:
         msg_history = []
 
-    if model in AVAILABLE_VLMS:
+    if model in AVAILABLE_VLMS or claude_code.is_claude_code_model(model):
         # Convert single image path to list for consistent handling
         if isinstance(image_paths, str):
             image_paths = [image_paths]
@@ -167,15 +175,17 @@ def get_response_from_vlm(
         # Construct message with all images
         new_msg_history = msg_history + [{"role": "user", "content": content}]
 
-        response = make_vlm_call(
-            client,
-            model,
-            temperature,
-            system_message=system_message,
-            prompt=new_msg_history,
-        )
-
-        content = response.choices[0].message.content
+        if claude_code.is_claude_code_model(model):
+            content, _, _ = claude_code.query(new_msg_history, model, system_message)
+        else:
+            response = make_vlm_call(
+                client,
+                model,
+                temperature,
+                system_message=system_message,
+                prompt=new_msg_history,
+            )
+            content = response.choices[0].message.content
         new_msg_history = new_msg_history + [{"role": "assistant", "content": content}]
     else:
         raise ValueError(f"Model {model} not supported.")
@@ -194,7 +204,10 @@ def get_response_from_vlm(
 
 def create_client(model: str) -> tuple[Any, str]:
     """Create client for vision-language model."""
-    if model in [
+    if claude_code.is_claude_code_model(model):
+        print(f"Using Claude subscription (Claude Agent SDK) with model {model}.")
+        return None, model
+    elif model in [
         "gpt-4o-2024-05-13",
         "gpt-4o-2024-08-06",
         "gpt-4o-2024-11-20",
@@ -279,7 +292,7 @@ def get_batch_responses_from_vlm(
     if msg_history is None:
         msg_history = []
 
-    if model in AVAILABLE_VLMS:
+    if model in AVAILABLE_VLMS or claude_code.is_claude_code_model(model):
         # Convert single image path to list
         if isinstance(image_paths, str):
             image_paths = [image_paths]
@@ -301,7 +314,12 @@ def get_batch_responses_from_vlm(
         # Construct message with all images
         new_msg_history = msg_history + [{"role": "user", "content": content}]
 
-        if model.startswith("ollama/"):
+        if claude_code.is_claude_code_model(model):
+            contents = [
+                claude_code.query(new_msg_history, model, system_message)[0]
+                for _ in range(n_responses)
+            ]
+        elif model.startswith("ollama/"):
             response = client.chat.completions.create(
                 model=model.replace("ollama/", ""),
                 messages=[
@@ -328,7 +346,8 @@ def get_batch_responses_from_vlm(
             )
 
         # Extract content from all responses
-        contents = [r.message.content for r in response.choices]
+        if not claude_code.is_claude_code_model(model):
+            contents = [r.message.content for r in response.choices]
         new_msg_histories = [
             new_msg_history + [{"role": "assistant", "content": c}] for c in contents
         ]

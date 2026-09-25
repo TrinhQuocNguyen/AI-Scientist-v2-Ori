@@ -106,6 +106,8 @@ class TokenTracker:
 
     def calculate_cost(self, model: str) -> float:
         """Calculate the cost for a specific model based on token usage."""
+        if model.startswith("claude-code/"):
+            return 0.0  # covered by the Claude subscription, not billed per token
         if model not in self.MODEL_PRICES:
             logging.warning(f"Price information not available for model {model}")
             return 0.0
@@ -154,6 +156,8 @@ def track_token_usage(func):
         logging.info("kwargs: ", kwargs)
 
         result = await func(*args, **kwargs)
+        if not hasattr(result, "model"):  # not a raw API response (e.g. a tuple)
+            return result
         model = result.model
         timestamp = result.created
 
@@ -190,6 +194,8 @@ def track_token_usage(func):
                 "Either 'prompt' or 'system_message' must be provided for token tracking"
             )
         result = func(*args, **kwargs)
+        if not hasattr(result, "model"):  # not a raw API response (e.g. a tuple)
+            return result
         model = result.model
         timestamp = result.created
         logging.info("args: ", args)

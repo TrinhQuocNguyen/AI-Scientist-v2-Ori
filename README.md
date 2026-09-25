@@ -62,6 +62,23 @@ Installation usually takes no more than one hour.
 
 ### Supported Models and API Keys
 
+#### Claude via your Claude subscription (no API key) — default
+
+All default models use the `claude-code/` prefix, which runs Claude through the [Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview) and the Claude subscription (Pro, Max, Team or Enterprise) you are logged in with. No API key is needed.
+
+```bash
+pip install claude-agent-sdk   # already in requirements.txt; bundles the Claude Code CLI
+claude login                   # or run `claude` once and choose your subscription account
+unset ANTHROPIC_API_KEY        # if set, Claude Code bills this key instead of your subscription
+```
+
+Pick models with `claude-code/<alias or model id>`, for example `claude-code/opus`, `claude-code/sonnet`, `claude-code/haiku` or `claude-code/claude-opus-5-5`. The defaults are `claude-code/opus` for experiment code and the paper writeup, and `claude-code/sonnet` for everything else (see `bfts_config.yaml` and `launch_scientist_bfts.py`).
+
+Notes:
+- Usage counts against your subscription's usage limits. A full run makes many calls, so it can hit a limit; when that happens the pipeline waits for the limit to reset and continues. Set `CLAUDE_CODE_MAX_RETRIES` (default 8) to control how many times a call is retried.
+- `temperature` and `max_tokens` settings are ignored for `claude-code/` models.
+- `token_tracker.json` still records token counts, with cost reported as 0 since usage is covered by the subscription.
+
 #### OpenAI Models
 
 By default, the system uses the `OPENAI_API_KEY` environment variable for OpenAI models.
@@ -105,7 +122,7 @@ Before running the full AI Scientist-v2 experiment pipeline, you first use the `
     ```bash
     python ai_scientist/perform_ideation_temp_free.py \
      --workshop-file "ai_scientist/ideas/my_research_topic.md" \
-     --model gpt-4o-2024-05-13 \
+     --model claude-code/opus \
      --max-num-generations 20 \
      --num-reflections 5
     ```
@@ -138,17 +155,17 @@ Key tree search configuration parameters in `bfts_config.yaml`:
     -   `debug_prob`: The probability of attempting to debug a failing node.
     -   `num_drafts`: The number of initial root nodes (i.e., the number of independent trees to grow) during Stage 1.
 
-Example command to run AI-Scientist-v2 using a generated idea file (e.g., `my_research_topic.json`). Please review `bfts_config.yaml` for detailed tree search parameters (the default config includes `claude-3-5-sonnet` for experiments). Do not set `load_code` if you do not want to initialize experimentation with a code snippet.
+Example command to run AI-Scientist-v2 using a generated idea file (e.g., `my_research_topic.json`). Please review `bfts_config.yaml` for detailed tree search parameters (the default config uses `claude-code/opus` for experiments). Do not set `load_code` if you do not want to initialize experimentation with a code snippet.
 
 ```bash
 python launch_scientist_bfts.py \
  --load_ideas "ai_scientist/ideas/my_research_topic.json" \
  --load_code \
  --add_dataset_ref \
- --model_writeup o1-preview-2024-09-12 \
- --model_citation gpt-4o-2024-11-20 \
- --model_review gpt-4o-2024-11-20 \
- --model_agg_plots o3-mini-2025-01-31 \
+ --model_writeup claude-code/opus \
+ --model_citation claude-code/sonnet \
+ --model_review claude-code/sonnet \
+ --model_agg_plots claude-code/sonnet \
  --num_cite_rounds 20
 ```
 
